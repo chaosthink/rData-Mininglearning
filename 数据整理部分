@@ -1,0 +1,96 @@
+####机器学习实例
+###使用到的包
+#arm包  用于构建多水平/层次回归模型
+#ggplot2包   绘图首选
+#glmnet包  包含lasso和elastic-net的正则化广义线性模型
+#igraph  简单的图及网络分析程序，用于模拟社交网络
+#lme4   提供函数用于创建线性及广义混合效应模型
+#lubridate  提供处理日期函数
+#RCurl 从网络中读取数据
+#reshape  用于数据处理
+#RJSONIO  渡劫json数据
+#tm  提供文本挖掘函数
+#XML  解析XML及HTML文件
+#https://blog.csdn.net/u011402596/article/details/43938093 字符串处理函数学习
+#####
+######机器学习的R基础
+
+####UFO数据集实例
+ufo<- read.delim("C:/Users/fzx/Documents/ML_for_Hackers-master/slides/01-Slides/ls/ufo_awesome.tsv",sep="\t",stringsAsFactors=F,header=F,na.strings="")
+
+names(ufo)<- c('dateOccurred','dateReported','location','shortDescription','duration','longDescription')
+head(ufo)
+#将yyyymmdd数据转换一下
+ufo$dateOccurred<-as.Date(ufo$dateOccurred,format='%Y%m%d')
+##报错，原因，字符太长，必须先清洗数据
+###既定日期长度为8，因此首先筛选出不等于8的列，输出第一列
+head(ufo[which(nchar(ufo$dateOccurred)!=8|nchar(ufo$dateReported)!=8),1])
+good.rows<- ifelse(nchar(ufo$dateOccurred)!=8|nchar(ufo$dateReported)!=8,FALSE,TRUE)
+length(which(!good.rows))  #有688个数据有问题
+ufo1<-ufo[good.rows,]  #剔除掉有问题的数据
+
+ufo1$dateOccurred<- as.Date(ufo1$dateOccurred,format='%Y%m%d')
+ufo1$dateReported<- as.Date(ufo1$dateReported,format='%Y%m%d')
+#####将日期变为了其他格式
+#######
+#########
+##########组织目击地点数据 ,将字符拆成两列  拆分可以用strsplit函数
+get.location<- function(l){
+ split.location<- tryCatch(strsplit(l,',')[[1]],error=function(e) return(c(NA,NA)))
+ clean.location<- gsub("^"," ",split.location)
+ if(length(clean.location)>2){
+    return(c(NA,NA))
+}
+  else{
+    return(clean.location)
+ }
+}
+##遇到strsplit处理不了的函数就返回NA值表示数据无效，然后用gsub正则表达式将空格去掉，确保返回向量长度为2
+city.state<- lapply(ufo1$location,get.location)
+head(city.state)
+
+location.matrix1<- splat(rbind)(city.state) ###plyr包里的用法，与下面的相同
+location.matrix<- do.call(rbind,city.state) #do.call把前面的函数用到后面的数据集中
+
+ufo1<- transform(ufo1,UScity=location.matrix[,1],USstate=tolower(location.matrix[,2]),stringsAsFactors=F)
+ufo2<- mutate(ufo1,UScity=location.matrix[,1],USstate=tolower(location.matrix[,2]))
+###上面两个用法一样，mutate是dplyr包里的
+us.states<- c('ak','al','ar','az','ca','co','ct','de','fl','ga','hi','ia','id',
+'il','in','ks','ky','la','ma','md','me','mi','mo','ms','mt','nc','nd','ne','nh',
+'nj','nm','nv','ny','oh','ok','or','pa','ri','sc','tn','tx','ut','va','vt','wa','wi','wv','wy')
+ufo1$USstate<- gsub(" ","",ufo1$USstate)  ##gsub 替换函数 把空格去掉
+ufo1$USstate<- us.states[match(ufo1$USstate,us.states)]  #match 用于匹配，第一个参数是待匹配的，第二个是匹配的参数，如果没有找到就返回NA值
+ufo1$UScity[is.na(ufo1$USstate)]<- NA ###第一步已经找出来NA值，第二步把NA值进一步使用，将city也改成NA值
+###
+######筛选出不是空值的数据集
+ufo.us<- subset(ufo1,!is.na(USstate))
+head(ufo.us)
+tail(ufo.us)
+####
+######聚合并组织数据
+summary(ufo.us$dateOccurred)
+library(ggplot2)
+quick.hist<- ggplot(ufo.us,aes(x=dateOccurred)) ##基本图层
+quick.hist+geom_histogram()
+#由图可见，绝大部分目击时间发生在1960-2010年间，主要集中在90年到2010年
+ufo.us<- subset(ufo.us,dateOccurred>=as.Date('1990-01-01'))
+nrow(ufo.us)
+quick.hist<- ggplot(ufo.us,aes(x=dateOccurred)) ##基本图层
+quick.hist+geom_histogram()
+#
+ufo.us$yearmonth<- strftime(ufo.us$dateOccurred,format='%y-%m')
+##添加一个新列 格式为YYYY-MM
+sightings.counts<- ddply(ufo.us,.(USstate,yearmonth),nrow)
+##使用ddply统计每个月份的数量
+###必须补齐所有的日期
+date.range<- seq.Date(from=as.Date(min(ufo.us$dateOccurred)),to=as.Date(max(ufo.us$dateOccurred)),by='month')
+###生成一组完整的时间
+date.strings<- strftime(date.range,'%Y-%m')
+#变换数据格式
+states.dates<- lapply(us.states,function(s)cbind(s,date.strings))
+#就是生成列表可以弄出所有组合可能
+all.sightings<- merge(states.dates,sightings.counts,
+by.x=c('s','date.strings'),by.y=c('USstate','yearmonth'),all=T)
+#####
+#####
+######
