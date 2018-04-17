@@ -1,0 +1,40 @@
+########数据分析章节
+
+#数值摘要表
+
+
+heights.weights<- read.csv('01_heights_weights_genders.csv',header=T,sep=',')
+heights<- with(heights.weights,Height) #with相当于从数据框里把某列取出来
+summary(heights)
+
+##均值分位数方差标准差等等忽略
+##
+####可视化分析
+#https://blog.csdn.net/Bone_ACE/article/details/47455363 ggplot画饼图
+library(ggplot2)
+ggplot(heights.weights,aes(x=Height,color=Gender))+geom_histogram(binwidth=1)
+ggplot(heights.weights,aes(x=Height))+geom_histogram(binwidth=5)
+ggplot(heights.weights,aes(x=Height))+geom_histogram(binwidth=.001)
+#不同的组宽度可以展现不同的数据特征
+
+##核密度图
+ggplot(heights.weights,aes(x=Height))+geom_density()
+ggplot(heights.weights,aes(x=Height,fill=Gender))+geom_density()
+##
+ggplot(heights.weights,aes(x=Weight,fill=Gender))+geom_density()+facet_grid(Gender~.)
+####把曲线拆分成两块  fancet_grid(Gender~.)
+
+##画正态分布
+m<-1 
+s<- 2
+ggplot(data.frame(X=rnorm(100000,m,s)),aes(x=X))+geom_density()
+
+###偏态峰态
+set.seed(1)
+normal.values<- rnorm(250,0,1)
+cauchy.value<-rcauchy(250,0,1)
+range(normal.values)
+range(cauchy.value)
+ggplot(data.frame(X=normal.values),aes(x=X))+geom_density()
+ggplot(data.frame(X=cauchy.value),aes(x=X))+geom_density()
+#柯西分布是重尾
