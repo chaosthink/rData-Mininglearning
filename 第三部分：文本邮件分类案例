@@ -1,0 +1,63 @@
+####第三章，垃圾分类
+########
+#机器学习解决无法用直线作为决策边界的问题，特别方法为核方法
+##判断邮件是否是垃圾邮件， 使用01变量
+#处理文本最重要的特征是词频
+###
+#####文本分类的核心是条件概率
+#常用的文本分类算法是 朴素贝叶斯分类器
+#朴素贝叶斯检索两类词判断文本类型， 1是更可能是在垃圾邮件中出现的次， 2是更可能在非垃圾邮件中出现的词
+#需要多高的可能性才值得贴上垃圾邮件的标签，取决于一封垃圾邮件出现的概率，也就是先验概率
+#
+####试写第一个贝叶斯垃圾分类器
+####
+####SpamAssassin数据集 标注三类邮件 垃圾邮件spam 易识别的正常邮件easy ham 不易识别的正常邮件 hard ham
+##案例不考虑头部信息，因此需要跳过头部信息
+library(tm)
+library(ggplot2)
+##设置路径
+spam.path<- 'data/spam/'
+spam2.path<- 'data/spam_2/'
+easyham.path<- 'data/easy_ham/'
+easyham2.path<- 'data/easy_ham_2/'
+hardham.path<- 'data/hard_ham/'
+hardham2.path<-'data/hard_ham_2/'
+
+#写读文本的函数
+#参考文档 https://www.cnblogs.com/gyjerry/p/5562478.html
+###注意tryCatch的妙用，忽略大量错误信息，转化为NA值
+get.msg<- function(path){
+   con<- file(path,open='rt',encoding='latin1')
+   #打开文件，以rt模式*read as text ，编码形式为 latin1 因为ascII不一定能用
+   text<- readLines(con)
+   #开始读文本
+   msg<- tryCatch(text[seq(which(text == "")[1]+1, length(text), 1)], error = function(e) return(NA))
+   ##tryCatch 极其好用的函数 错误时忽略并反馈成NA值
+   #读取空行后的加1行到最后
+   close(con) #关闭文件
+   return(paste(msg,collapse='\n')) ##把文本拼接为一条长文本
+}
+
+con<- file('data/spam/00001.7848dde101aa985090474a91ec93fcf0',open='rt',encoding='latin1')
+
+
+###使用apply函数实现对所有邮件的应用
+spam.docs<-dir(spam.path) #使用dir函数得到路径中的所有文件名列表
+spam.docs<- spam.docs[which(spam.docs!='cmds')] #排除掉cmds文件
+
+all.spam<-sapply(spam.docs,function(p)get.msg(paste(spam.path,p,sep="")))
+#循环使用链接
+#tm包可以快速处理文本工作
+#量化垃圾邮件特征词频方法是构建词项-文档矩阵 TDM
+#中文分词用Rwordseg包  参考https://www.zhihu.com/question/39615472
+get.tdm<- function(doc.vec){
+  doc.corpus<- Corpus(VectorSource(doc.vec))
+  #选择相应对象建立语料库，这里用的是VectorSource 使用corpus函数配合使用，可以查看其它方式 ?getSources
+  control<- list(stopwords=T,removePunctuation=T,removeNumbers=T,minDocFreq=2)
+  #stopwords表示停用词，库里有488个，removePunctuation是标点符号， removeNumbers是数字，minDocFreq是字频
+  doc.dtm<- TermDocumentMatrix(doc.corpus,control)
+  #构建tdm 并用上面的列表进行筛选
+  return(doc.dtm)
+}
+spam.tdm<- get.tdm(all.spam)
+###page86
