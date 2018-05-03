@@ -1,0 +1,61 @@
+#第五章 回归 ：预测网页访问量
+
+##先对数据进行预分析
+ages<- read.csv('longevity.csv')
+library(ggplot2)
+p<-ggplot(ages,aes(x=AgeAtDeath,fill=factor(Smokes)))
+p+geom_density()+facet_grid(Smokes~.)  #facet_grid 命令图分开画
+
+###分组计算均方根误差
+constant.guess<- with(ages,mean(AgeAtDeath))
+constant.guess2<- mean(ages$AgeAtDeath)###与上面一样
+with(ages,sqrt(mean((AgeAtDeath-constant.guess)^2)))
+smokers.guess<- with(subset(ages,Smokes==0),mean(AgeAtDeath))
+non.smokers.guess<- with(subset(ages,Smokes==0),mean(AgeAtDeath))
+ages<-transform(ages,newprediction=ifelse(Smokes==0,non.smokers.guess,smokers.guess))
+with(ages,sqrt(mean(AgeAtDeath~newprediction)^2)))
+
+##
+heights.weights<- read.csv('01_heights_weights_genders.csv',header=T,sep=',')
+p<- ggplot(heights.weights,aes(x=Height,y=Weight,fill=factor(Gender)))
+p+geom_point()+geom_smooth(method='lm')
+
+###建立回归模型
+fitted.reg<- lm(Weight~Height,data=heights.weights)
+predict(fitted.reg) #预测模型
+true.values<- with(heights.weights,Weight)
+errors<- true.values-predict(fitted.reg)
+residuals(fitted.reg)
+
+plot(fitted.reg)
+
+##########
+######网页流量预测
+####1000个最流行的网页数据
+top.1000.sites<-read.csv('top_1000_sites.tsv',sep='\t',stringsAsFactors=F)
+
+p<- ggplot(top.1000.sites,aes(x=PageViews,y=UniqueVisitors))
+p+geom_point()
+p<- ggplot(top.1000.sites,aes(x=PageViews))
+p+geom_density()
+###两个图均呈现不佳
+p<- ggplot(top.1000.sites,aes(x=log(PageViews),y=log(UniqueVisitors)))
+p+geom_point()###效果好一点了，接着拟合一条线
+p+geom_point()+geom_smooth(method='lm',se=F)
+####拟合一元回归
+lm.fit<- lm(log(PageViews)~log(UniqueVisitors),data=top.1000.sites)
+summary(lm.fit)
+
+###拟合多元回归
+lm.fit2<- lm(log(PageViews)~HasAdvertising+log(UniqueVisitors)+InEnglish,data=top.1000.sites)
+summary(lm.fit2)
+
+##提取各个模型的r方
+lm.fit3<- lm(log(PageViews)~HasAdvertising,data=top.1000.sites)
+summary(lm.fit3)$r.squared
+
+lm.fit4<- lm(log(PageViews)~InEnglish,data=top.1000.sites)
+summary(lm.fit4)$r.squared
+
+summary(lm.fit)$r.squared
+###是否有广告的R方很小
