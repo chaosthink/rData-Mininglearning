@@ -59,3 +59,5 @@ test.df<- data.frame(x=test.x,y=test.y)
 
 #写一个均方误差的函数来度量拟合效果
 rmse<- function(y,h) return(sqrt(mean((y-h)^2)))
+
+#page167
