@@ -1,0 +1,116 @@
+##第十章 KNN推荐系统
+###重点内容
+#####KNN k近邻法  k nearest neighbors
+df<- read.csv('C:/Users/fzx/Documents/ML_for_Hackers-master/10-Recommendations/data/example_data.csv')
+head(df)
+##自己写 knn算法
+#计算数据集所有点两两之间的距离，并保存到距离矩阵
+#使用欧式距离
+
+distance.matrix<- function(df){
+
+  distance<- matrix(rep(NA,nrow(df)^2),nrow=nrow(df))
+  for (i in 1:nrow(df)){
+    for (j in 1:nrow(df)){
+      distance[i,j]<- sqrt((df[i,'X']-df[j,'X'])^2+(df[i,'Y']-df[j,'Y'])^2)
+
+  }
+} 
+   return(distance)
+}
+##返回k近邻，就是根据取出的点，对其余点进行排序，选择排序前k个点
+distance<- distance.matrix(df)
+k.nearest.neighbors<- function(i,distance,k=5){
+  return(order(distance[i,])[2:(k+1)])
+}
+
+###knn函数
+knn2<- function(df,k=5){
+  distance<- distance.matrix(df)
+  predictions<-rep(NA,nrow(df))
+  for(i in 1:nrow(df)){
+   indices<- k.nearest.neighbors(i,distance,k=k)
+   predictions[i]<- ifelse(mean(df[indices,'Label'])>0.5,1,0)
+}
+   return(predictions)
+}
+##
+df<- transform(df,knnpre=knn2(df))
+sum(with(df,Label != knnpre))
+##
+####使用R自带的knn
+library(class)
+
+df<- read.csv('C:/Users/fzx/Documents/ML_for_Hackers-master/10-Recommendations/data/example_data.csv')
+
+n<- nrow(df)
+
+set.seed(1)
+indices<- sort(sample(1:n,n*(1/2)))
+
+training.x<- df[indices,1:2]
+test.x<-df[-indices,1:2]
+training.y<- df[indices,3]
+test.y<- df[-indices,3]
+
+predicted.y<-knn(training.x,test.x,training.y,k=5)
+sum(predicted.y != test.y)
+####错了7个点
+
+##使用逻辑回归看看
+logit.model<- glm(Label~X+Y,data=df[indices,])
+predictions<- as.numeric(predict(logit.model,newdata=df[-indices,])>0)
+sum(predictions !=test.y)
+###准确率较低，完全不是线性的情况下，knn效果比逻辑回归好
+#https://www.zhihu.com/question/29679189 参考：集成学习  如何组合算法
+#https://blog.csdn.net/qq_23052951/article/details/53729788
+#https://blog.csdn.net/sandyzhs/article/details/47975423
+
+####R语言程序包安装推荐
+#用KNN找到与目标客户比较相近的用户，然后根据品味相近用户的喜好来为目标用户推荐
+installations<- read.csv('c:/Users/fzx/Documents/ML_for_Hackers-master/10-Recommendations/data/installations.csv')
+
+###将长数据格式转为宽数据格式
+library(reshape)
+user.package.matrix<- cast(installations,User~Package,value='Installed')
+#将数据转为类似矩阵的形式
+
+row.names(user.package.matrix)<- user.package.matrix[,1]
+user.package.matrix<- user.package.matrix[,-1]
+
+#计算相关性
+similarities<- cor(user.package.matrix)
+
+nrow(similarities)
+
+distances<- -log((similarities/2)+0.5)  ##把相关系数转化成了距离
+curve(-log((x/2)+0.5))
+
+k.nearest.neighbors<- function(i,distance,k=25)
+{
+    return(order(distances[i,])[2:(k+1)])
+}
+
+installation.probability<- function(user,package,user.package.matrix,distances,k=25){
+ neighbors<- k.nearest.neighbors(package,distances,k=k)
+ return(mean(sapply(neighbors,function(neighbor){user.package.matrix[user,neighbor]})))
+}
+
+installation.probability(1,1,user.package.matrix,distances)
+##有0.76的概率安装了程序包1，找到用户最可能安装的程序包，并推荐给他
+
+most.probable.packages<- function(user,user.package.matrix,distances,k=25){
+ return(order(sapply(1:ncol(user.package.matrix),
+   function(package){
+    installation.probability(user,package,user.package.matrix,distances,k=k)
+   }),
+    decreasing=T))
+}
+
+user<- 1
+listing<- most.probable.packages(user,user.package.matrix,distances)
+
+colnames(user.package.matrix)[listing[1:10]]
+
+
+
